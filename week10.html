@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHubユーザー情報表示ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen p-8">
+    <div class="mx-auto max-w-2xl">
+      <!-- ヘッダー -->
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900 mb-2">GitHubユーザー検索</h1>
+        <p class="text-slate-600">ユーザー名を入力してGitHubプロフィール情報を表示します</p>
+      </div>
+
+      <!-- 検索フォーム -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="flex gap-3">
+          <input 
+            id="username" 
+            type="text" 
+            placeholder="GitHubユーザー名を入力 (例: octocat)"
+            class="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+          <button 
+            id="searchBtn"
+            class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg transition-colors duration-200"
+          >
+            検索
+          </button>
+        </div>
+        <div id="status" class="mt-3 text-sm"></div>
+      </div>
+
+      <!-- 結果表示エリア -->
+      <div id="userInfo" class="bg-white rounded-lg shadow-md p-6"></div>
+    </div>
+
+    <script>
+      // ユーザー情報を取得する関数
+      async function searchUser() {
+        const username = document.getElementById("username").value.trim();
+        const userInfo = document.getElementById("userInfo");
+        const status = document.getElementById("status");
+        const searchBtn = document.getElementById("searchBtn");
+
+        // 入力チェック
+        if (!username) {
+          status.textContent = "ユーザー名を入力してください";
+          status.className = "mt-3 text-sm text-red-500";
+          userInfo.innerHTML = "";
+          return;
+        }
+
+        // ローディング表示
+        status.textContent = "読み込み中...";
+        status.className = "mt-3 text-sm text-blue-500";
+        searchBtn.disabled = true;
+        searchBtn.classList.add("opacity-50");
+
+        try {
+          // GitHub APIにリクエストを送る
+          const response = await fetch(`https://api.github.com/users/${username}`);
+
+          // 通信の成功確認
+          if (!response.ok) {
+            throw new Error("ユーザーが見つかりませんでした");
+          }
+
+          // JSONデータを取得
+          const data = await response.json();
+
+          // Consoleで確認用（PR本文に記載）
+          console.log("取得したGitHubユーザーデータ:", data);
+          console.log("使用プロパティ:");
+          console.log("- avatar_url:", data.avatar_url);
+          console.log("- name:", data.name);
+          console.log("- bio:", data.bio);
+          console.log("- followers:", data.followers);
+
+          // データを画面に表示
+          displayUserInfo(data);
+          status.textContent = "✓ データ取得完了";
+          status.className = "mt-3 text-sm text-green-500";
+
+        } catch (error) {
+          // エラー処理
+          userInfo.innerHTML = `
+            <div class="text-center py-8">
+              <div class="text-6xl mb-4">❌</div>
+              <p class="text-lg font-bold text-red-600 mb-2">ユーザーが見つかりませんでした</p>
+              <p class="text-slate-600">ユーザー名を確認して、もう一度検索してください</p>
+            </div>
+          `;
+          status.textContent = "取得に失敗しました: " + error.message;
+          status.className = "mt-3 text-sm text-red-500";
+          console.error("エラー詳細:", error);
+
+        } finally {
+          // ボタンの状態を戻す
+          searchBtn.disabled = false;
+          searchBtn.classList.remove("opacity-50");
+        }
+      }
+
+      // ユーザー情報を表示する関数
+      function displayUserInfo(user) {
+        const userInfo = document.getElementById("userInfo");
+
+        // bioがnullの場合は「未設定」と表示
+        const bioText = user.bio || "自己紹介は未設定です";
+        
+        // プロフィール画像が取得できない場合のフォールバック
+        const avatarUrl = user.avatar_url || "https://via.placeholder.com/150?text=No+Image";
+
+        userInfo.innerHTML = `
+          <div class="flex flex-col md:flex-row gap-6">
+            <!-- アバター画像 -->
+            <div class="flex justify-center md:justify-start">
+              <img 
+                src="${avatarUrl}" 
+                alt="${user.name || user.login}"
+                class="w-32 h-32 rounded-full border-4 border-blue-200 shadow-lg object-cover"
+              >
+            </div>
+
+            <!-- ユーザー情報 -->
+            <div class="flex-1">
+              <!-- 名前またはログイン名 -->
+              <h2 class="text-3xl font-bold text-slate-900 mb-2">
+                ${user.name || user.login}
+              </h2>
+
+              <!-- ユーザー名（リンク付き） -->
+              <p class="text-slate-600 mb-4">
+                <a 
+                  href="https://github.com/${user.login}" 
+                  target="_blank"
+                  class="text-blue-500 hover:text-blue-700 underline"
+                >
+                  @${user.login}
+                </a>
+              </p>
+
+              <!-- 自己紹介 -->
+              <div class="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <p class="text-slate-700">
+                  ${bioText}
+                </p>
+              </div>
+
+              <!-- フォロワー情報 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <p class="text-slate-600 text-sm font-medium">フォロワー</p>
+                  <p class="text-3xl font-bold text-blue-600">${user.followers.toLocaleString()}</p>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <p class="text-slate-600 text-sm font-medium">フォロー中</p>
+                  <p class="text-3xl font-bold text-purple-600">${user.following.toLocaleString()}</p>
+                </div>
+              </div>
+
+              <!-- 追加情報 -->
+              <div class="mt-6 pt-6 border-t border-slate-200">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                  ${user.location ? `
+                    <div>
+                      <p class="text-slate-600">📍 場所</p>
+                      <p class="text-slate-900 font-medium">${user.location}</p>
+                    </div>
+                  ` : ""}
+                  ${user.blog ? `
+                    <div>
+                      <p class="text-slate-600">🔗 ブログ</p>
+                      <a 
+                        href="${user.blog}" 
+                        target="_blank"
+                        class="text-blue-500 hover:text-blue-700 underline break-all"
+                      >
+                        ${user.blog}
+                      </a>
+                    </div>
+                  ` : ""}
+                  <div>
+                    <p class="text-slate-600">📦 パブリック リポジトリ</p>
+                    <p class="text-slate-900 font-medium">${user.public_repos}</p>
+                  </div>
+                  <div>
+                    <p class="text-slate-600">⭐ Gist</p>
+                    <p class="text-slate-900 font-medium">${user.public_gists}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // ボタンのクリックイベント
+      document.getElementById("searchBtn").addEventListener("click", searchUser);
+
+      // Enterキーで検索実行
+      document.getElementById("username").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          searchUser();
+        }
+      });
+
+      // ページ読み込み時の初期表示
+      document.getElementById("userInfo").innerHTML = `
+        <div class="text-center py-12">
+          <div class="text-6xl mb-4">🔍</div>
+          <p class="text-lg text-slate-600">GitHubユーザー名を入力して検索してください</p>
+        </div>
+      `;
+    </script>
+  </body>
+</html>
